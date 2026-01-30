@@ -1,6 +1,3 @@
-# ===============================
-# Python
-# ===============================
 __pycache__/
 *.py[cod]
 *.pyo
@@ -9,46 +6,25 @@ __pycache__/
 *.egg-info/
 .eggs/
 
-# ===============================
-# Virtual Environment
-# ===============================
 venv/
 .env/
 
-# ===============================
-# Logs
-# ===============================
 *.log
 logs/
 
-# ===============================
-# Generated Outputs
-# ===============================
 output/
 data/images/
 assets/generated/
 
-# ===============================
-# Google / API Credentials (VERY IMPORTANT)
-# ===============================
 credentials.json
 token.json
 
-# ===============================
-# OS / Editor junk
-# ===============================
 .DS_Store
 Thumbs.db
 .vscode/
 .idea/
 
-# ===============================
-# PDFs / Reports (optional – keep repo clean)
-# ===============================
 *.pdf
 
-# ===============================
-# Temporary files
-# ===============================
 *.tmp
 *.bak
