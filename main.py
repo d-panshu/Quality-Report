@@ -1,5 +1,5 @@
 """
-Production-Ready Daily Quality Report Generator
+Daily Quality Report Generator
 """
 import os
 import re
@@ -15,11 +15,10 @@ from config import (
 from pdf_generator import generate_daily_report_pdf
 from PIL import Image
 
-# ==================== LOGGING SETUP ====================
+
+# setup application logging
 def setup_logging():
-    """Configure logging for production"""
     os.makedirs(os.path.dirname(LOG_FILE), exist_ok=True)
-    
     logging.basicConfig(
         level=getattr(logging, LOG_LEVEL),
         format='%(asctime)s - %(levelname)s - %(message)s',
@@ -32,9 +31,9 @@ def setup_logging():
 
 logger = setup_logging()
 
-# ==================== UTILITY FUNCTIONS ====================
+
+# extract google drive file id from url
 def extract_file_id(url):
-    """Extract Google Drive file ID from various URL formats"""
     if not url or not isinstance(url, str):
         return None
 
@@ -52,8 +51,8 @@ def extract_file_id(url):
     return None
 
 
+# convert date to yyyy-mm-dd
 def normalize_date(val):
-    """Convert date string to YYYY-MM-DD format"""
     try:
         return datetime.strptime(str(val).strip(), "%m/%d/%Y").strftime("%Y-%m-%d")
     except Exception as e:
@@ -61,29 +60,29 @@ def normalize_date(val):
         return ""
 
 
+# find column name ignoring case
 def find_col(df, name):
-    """Find column by name (case-insensitive)"""
     for c in df.columns:
         if c.strip().lower() == name.lower():
             return c
     return None
 
 
+# extract product name from column title
 def extract_product_name(column_name):
-    """Extract product name from column header"""
     return column_name.split("–")[0].strip()
 
 
+# check if file is a valid image
 def validate_image_file(file_path):
-    """Validate that the downloaded file is a valid image"""
     if not os.path.exists(file_path):
         return False
-    
+
     _, ext = os.path.splitext(file_path.lower())
     if ext not in VALID_IMAGE_EXTENSIONS:
         logger.warning(f"Invalid file extension: {ext} for {file_path}")
         return False
-    
+
     try:
         with Image.open(file_path) as img:
             img.verify()
@@ -93,12 +92,8 @@ def validate_image_file(file_path):
         return False
 
 
-# ==================== IMAGE DOWNLOAD FUNCTIONS ====================
+# download image and validate it
 def download_and_validate_image(drive, file_id, save_path, image_name):
-    """
-    Download and validate a single image
-    Returns: (success: bool, path: str)
-    """
     try:
         download_drive_file(drive, file_id, save_path)
         if validate_image_file(save_path):
@@ -114,11 +109,8 @@ def download_and_validate_image(drive, file_id, save_path, image_name):
         return False, PLACEHOLDER_IMAGE
 
 
+# process one image column from sheet
 def process_image_column(drive, first_row, col, save_path, image_name):
-    """
-    Process a single image column from the sheet
-    Returns: path to image (valid image or placeholder)
-    """
     cell = first_row[col]
     if hasattr(cell, "__iter__") and not isinstance(cell, str):
         cell = next((x for x in cell if x), "")
@@ -137,20 +129,14 @@ def process_image_column(drive, first_row, col, save_path, image_name):
     return path
 
 
-# ==================== MAIN PROCESSING ====================
+# process all images for one store
 def process_store_images(drive, first_row, store_name, store_dir, overall_columns, product_columns):
-    """
-    Process all images for a single store
-    Returns: (overall_images, product_images)
-    """
-    # Download overall photos
     overall_images = []
     for idx, col in enumerate(overall_columns, 1):
         save_path = os.path.join(store_dir, f"Overall_{idx}.jpg")
         img_path = process_image_column(drive, first_row, col, save_path, f"Overall photo {idx}")
         overall_images.append(img_path)
 
-    # Download product images
     product_images = []
     for col in product_columns:
         product = extract_product_name(col)
@@ -164,8 +150,8 @@ def process_store_images(drive, first_row, store_name, store_dir, overall_column
     return overall_images, product_images
 
 
+# main execution flow
 def main():
-    """Main function to process all stores and generate PDF report"""
     try:
         logger.info("="*60)
         logger.info(f"Starting Daily Quality Report Generation for {TODAY_STR}")
@@ -185,7 +171,6 @@ def main():
         df = read_sheet(sheets)
         logger.info(f"Found {len(df)} total rows in sheet")
 
-        # Find metadata columns
         date_col = find_col(df, "Date")
         store_col = find_col(df, "Store Name")
         email_col = find_col(df, "Email Address")
@@ -196,7 +181,6 @@ def main():
             logger.error("Missing required columns in sheet")
             return
 
-        # Filter for today's submissions
         df["__date"] = df[date_col].apply(normalize_date)
         df_today = df[df["__date"] == TODAY_STR]
 
@@ -213,7 +197,6 @@ def main():
         )
         logger.info(f"Found {len(overall_columns)} overall photo columns")
 
-        # Find product columns (exclude overall photos)
         product_columns = [
             c for c in df.columns 
             if "take a clear photo" in c.lower() 
@@ -223,7 +206,6 @@ def main():
         for col in product_columns:
             logger.debug(f"  - {extract_product_name(col)}")
 
-        # Process each store
         all_stores_data = []
         stores = df_today[store_col].unique()
         
@@ -236,11 +218,9 @@ def main():
             store_dir = os.path.join(IMAGE_DIR, store.replace(" ", "_"))
             os.makedirs(store_dir, exist_ok=True)
 
-            # Get first row for this store
             store_df = df_today[df_today[store_col] == store]
             first_row = store_df.iloc[0]
             
-            # Extract metadata
             meta = {
                 "store_name": store,
                 "email": str(first_row[email_col]) if email_col else "",
@@ -249,12 +229,10 @@ def main():
                 "date": TODAY_STR
             }
 
-            # Process images
             try:
                 overall_images, product_images = process_store_images(
                     drive, first_row, store, store_dir, overall_columns, product_columns
                 )
-
                 all_stores_data.append({
                     "meta": meta,
                     "overall_images": overall_images,
@@ -268,7 +246,6 @@ def main():
                 if not CONTINUE_ON_ERROR:
                     raise
 
-        # Generate PDF
         if all_stores_data:
             logger.info(f"\n{'='*60}")
             logger.info("Generating PDF report...")
@@ -286,6 +263,7 @@ def main():
         raise
 
 
+# app entry point
 if __name__ == "__main__":
     try:
         result = main()
